@@ -1,0 +1,80 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import TopicCard from './TopicCard.astro';
+
+interface Props {
+  topics: CollectionEntry<'topics'>[];
+  postCounts: Record<string, number>;
+}
+
+const { topics, postCounts } = Astro.props;
+
+// Sort topics by post count descending to place larger tiles at the top
+const sortedTopics = [...topics].sort((a, b) => {
+  const countA = postCounts[a.id] || 0;
+  const countB = postCounts[b.id] || 0;
+  return countB - countA;
+});
+
+// Helper to calculate card sizes dynamically based on post count
+function calculateCardSize(postCount: number, index: number): 'small' | 'medium' | 'large' {
+  // First item always gets a boost to maintain bento visual hierarchy
+  if (index === 0) {
+    return postCount >= 3 ? 'large' : 'medium';
+  }
+  
+  if (postCount >= 4) {
+    return 'large';
+  }
+  if (postCount >= 2) {
+    return 'medium';
+  }
+  return 'small';
+}
+---
+
+<div class="bento-grid">
+  {sortedTopics.map((topic, index) => {
+    const postCount = postCounts[topic.id] || 0;
+    const size = calculateCardSize(postCount, index);
+    return (
+      <TopicCard
+        topic={topic}
+        postCount={postCount}
+        size={size}
+      />
+    );
+  })}
+</div>
+
+<style>
+  .bento-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-auto-rows: minmax(260px, auto);
+    gap: 1.5rem;
+    grid-auto-flow: dense;
+    margin: 2rem 0;
+  }
+
+  /* Responsive styling */
+  @media (max-width: 1024px) {
+    .bento-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 768px) {
+    .bento-grid {
+      grid-template-columns: repeat(2, 1fr);
+      grid-auto-rows: minmax(220px, auto);
+    }
+  }
+
+  @media (max-width: 640px) {
+    .bento-grid {
+      grid-template-columns: 1fr;
+      grid-auto-rows: auto;
+    }
+  }
+</style>

@@ -1,0 +1,226 @@
+---
+import { getCollection, getEntry } from 'astro:content';
+import Layout from '../../../layouts/Layout.astro';
+import Breadcrumbs from '../../../components/Breadcrumbs.astro';
+import BlogCard from '../../../components/BlogCard.astro';
+
+export async function getStaticPaths() {
+  const allSeries = await getCollection('series');
+  
+  return allSeries.map((series) => {
+    // Determine topicSlug
+    const topicSlug = typeof series.data.topic === 'object' && 'id' in series.data.topic 
+      ? series.data.topic.id 
+      : String(series.data.topic);
+    
+    // seriesSlug is the second part of the ID
+    const seriesSlug = series.id.split('/').pop() || '';
+    
+    return {
+      params: { 
+        topic: topicSlug, 
+        series: seriesSlug 
+      },
+      props: { 
+        series, 
+        topicSlug 
+      }
+    };
+  });
+}
+
+const { series, topicSlug } = Astro.props;
+
+// Fetch topic metadata
+const topic = await getEntry('topics', topicSlug);
+
+// Fetch blogs in this series
+const allBlogs = await getCollection('blog');
+
+// Filter drafts in production
+const isProd = import.meta.env.PROD;
+const publicBlogs = allBlogs.filter((post) => !isProd || !post.data.draft);
+
+// Filter by matching series ID (e.g. "ai-engineering/rag-systems")
+const seriesBlogs = publicBlogs.filter((b) => b.data.series === series.id);
+
+// Sort blogs chronologically (ascending: part 1 first, part 2 next)
+seriesBlogs.sort((a, b) => a.data.pubDate.getTime() - b.data.pubDate.getTime());
+---
+
+<Layout 
+  title={`${series.data.title} | Series`}
+  description={series.data.description}
+>
+  {topic && (
+    <Breadcrumbs 
+      topic={{ title: topic.data.title, slug: topic.id }} 
+      series={{ title: series.data.title, slug: series.id.split('/').pop() || '' }}
+    />
+  )}
+
+  <header class="series-header">
+    <div class="series-meta">
+      <span class="badge">Series Hub</span>
+      <span class="series-count">{seriesBlogs.length} {seriesBlogs.length === 1 ? 'part' : 'parts'}</span>
+    </div>
+    <h1 class="series-title">{series.data.title}</h1>
+    <p class="series-description">{series.data.description}</p>
+  </header>
+
+  <section class="timeline-section">
+    {seriesBlogs.length === 0 ? (
+      <div class="empty-state">
+        <p>No parts have been published in this series yet. Check back soon!</p>
+      </div>
+    ) : (
+      <div class="timeline">
+        {seriesBlogs.map((post, index) => {
+          const formattedDate = new Date(post.data.pubDate).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+          });
+          
+          return (
+            <div class="timeline-item">
+              <div class="timeline-node">
+                <span class="node-number">{index + 1}</span>
+              </div>
+              <div class="timeline-content">
+                <div class="timeline-card">
+                  <BlogCard post={post} />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </section>
+</Layout>
+
+<style>
+  .series-header {
+    margin-bottom: 3.5rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .series-meta {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .series-count {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+
+  .series-title {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 1rem;
+    letter-spacing: -0.02em;
+  }
+
+  .series-description {
+    font-size: 1.15rem;
+    color: var(--text-secondary);
+    max-width: 800px;
+    margin-bottom: 0;
+  }
+
+  /* Timeline design pattern */
+  .timeline-section {
+    position: relative;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 3rem;
+  }
+
+  /* Vertical timeline line */
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 17px;
+    top: 20px;
+    bottom: 20px;
+    width: 2px;
+    background-color: var(--border-color);
+  }
+
+  .timeline-item {
+    position: relative;
+    margin-bottom: 3rem;
+  }
+
+  .timeline-item:last-child {
+    margin-bottom: 0;
+  }
+
+  /* Circular index node */
+  .timeline-node {
+    position: absolute;
+    left: -3rem;
+    top: 10px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: var(--bg-card);
+    border: 2px solid var(--accent-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .node-number {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--accent-color);
+  }
+
+  .timeline-content {
+    width: 100%;
+  }
+
+  .timeline-card {
+    transition: var(--transition-normal);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+  }
+
+  @media (max-width: 640px) {
+    .timeline {
+      padding-left: 2rem;
+    }
+    .timeline::before {
+      left: 11px;
+    }
+    .timeline-node {
+      left: -2rem;
+      width: 24px;
+      height: 24px;
+      top: 16px;
+    }
+    .node-number {
+      font-size: 0.7rem;
+    }
+  }
+</style>

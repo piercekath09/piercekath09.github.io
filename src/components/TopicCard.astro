@@ -1,0 +1,168 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { getTopicUrl } from '../lib/urls';
+
+interface Props {
+  topic: CollectionEntry<'topics'>;
+  postCount: number;
+  size: 'small' | 'medium' | 'large';
+}
+
+const { topic, postCount, size } = Astro.props;
+const { title, description, cover } = topic.data;
+const url = getTopicUrl(topic.id);
+
+// Custom gradients based on topic ID to give a premium unique feel if cover is missing
+const fallbackGradients: Record<string, string> = {
+  'ai-engineering': 'linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%)',
+  'web-dev': 'linear-gradient(135deg, #ec4899 0%, #f43f5e 100%)',
+};
+const defaultGradient = 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)';
+const bgGradient = fallbackGradients[topic.id] || defaultGradient;
+---
+
+<a href={url} class={`topic-card ${size}`} style={cover ? `background-image: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.85)), url(${cover});` : `background: ${bgGradient};`}>
+  <div class="card-content">
+    <div class="card-header">
+      <span class="badge post-count-badge">
+        {postCount} {postCount === 1 ? 'post' : 'posts'}
+      </span>
+    </div>
+    
+    <div class="card-body">
+      <h2 class="topic-title">{title}</h2>
+      <p class="topic-description">{description}</p>
+    </div>
+  </div>
+</a>
+
+<style>
+  .topic-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-md);
+    background-size: cover;
+    background-position: center;
+    color: #ffffff;
+    min-height: 240px;
+    padding: 2rem;
+    transition: var(--transition-normal);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Bento Grid sizing classes mapped to grid layouts */
+  .topic-card.small {
+    grid-column: span 1;
+    grid-row: span 1;
+  }
+
+  .topic-card.medium {
+    grid-column: span 2;
+    grid-row: span 1;
+  }
+
+  .topic-card.large {
+    grid-column: span 2;
+    grid-row: span 2;
+    min-height: 480px;
+  }
+
+  .topic-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(15, 23, 42, 0.9) 0%, rgba(15, 23, 42, 0.2) 60%, rgba(15, 23, 42, 0) 100%);
+    opacity: 0.85;
+    z-index: 1;
+    transition: var(--transition-normal);
+  }
+
+  .topic-card:hover {
+    transform: translateY(-6px) scale(1.01);
+    box-shadow: var(--shadow-lg), var(--shadow-accent);
+    border-color: var(--accent-color);
+  }
+
+  .topic-card:hover::after {
+    opacity: 0.95;
+  }
+
+  .card-content {
+    position: relative;
+    z-index: 2;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 1.5rem;
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: flex-start;
+  }
+
+  .post-count-badge {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  .topic-title {
+    font-size: 1.75rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    color: #ffffff;
+  }
+
+  .large .topic-title {
+    font-size: 2.25rem;
+  }
+
+  .topic-description {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.95rem;
+    margin-bottom: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .large .topic-description {
+    -webkit-line-clamp: 4;
+  }
+
+  /* Responsive breakpoints for Bento layout overrides */
+  @media (max-width: 1024px) {
+    .topic-card.large {
+      min-height: 380px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .topic-card.medium, .topic-card.large {
+      grid-column: span 2;
+      grid-row: span 1;
+      min-height: 240px;
+    }
+    .large .topic-title {
+      font-size: 1.75rem;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .topic-card.small, .topic-card.medium, .topic-card.large {
+      grid-column: span 1;
+      grid-row: span 1;
+      min-height: 220px;
+    }
+  }
+</style>

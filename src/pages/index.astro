@@ -1,0 +1,104 @@
+---
+import { getCollection } from 'astro:content';
+import Layout from '../layouts/Layout.astro';
+import BentoGrid from '../components/BentoGrid.astro';
+
+// Fetch topics and blog posts
+const topics = await getCollection('topics');
+const blogs = await getCollection('blog');
+
+// Filter drafts in production
+const isProd = import.meta.env.PROD;
+const publicBlogs = blogs.filter(post => !isProd || !post.data.draft);
+
+// Count public posts for each topic
+const postCounts = publicBlogs.reduce((acc, post) => {
+  const topicId = post.data.topic;
+  acc[topicId] = (acc[topicId] || 0) + 1;
+  return acc;
+}, {} as Record<string, number>);
+
+// Ensure even topics with 0 posts show up in the bento grid
+topics.forEach(topic => {
+  if (!(topic.id in postCounts)) {
+    postCounts[topic.id] = 0;
+  }
+});
+---
+
+<Layout 
+  title="Antigravity Blog — Modern 3-Tier Topic & Series Hub"
+  description="Explore type-safe structured technical topics, step-by-step guides, and articles organized by series."
+>
+  <div class="home-hero">
+    <h1 class="hero-title">Technical Deep Dives, Structured.</h1>
+    <p class="hero-subtitle">
+      Explore articles curated by topic and series to learn concepts from first principles to implementation details.
+    </p>
+  </div>
+
+  <section class="topics-section">
+    <div class="section-header">
+      <h2 class="section-title">Explore Topics</h2>
+      <div class="section-divider"></div>
+    </div>
+    
+    <BentoGrid topics={topics} postCounts={postCounts} />
+  </section>
+</Layout>
+
+<style>
+  .home-hero {
+    padding: 3rem 0;
+    max-width: 800px;
+  }
+
+  .hero-title {
+    font-size: 3.5rem;
+    font-weight: 800;
+    line-height: 1.15;
+    margin-bottom: 1.5rem;
+    letter-spacing: -0.02em;
+    background: var(--accent-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .hero-subtitle {
+    font-size: 1.25rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 0;
+  }
+
+  .topics-section {
+    margin-top: 1.5rem;
+  }
+
+  .section-header {
+    margin-bottom: 2rem;
+  }
+
+  .section-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 0.50rem;
+    color: var(--text-primary);
+  }
+
+  .section-divider {
+    height: 3px;
+    width: 60px;
+    background: var(--accent-gradient);
+    border-radius: 9999px;
+  }
+
+  @media (max-width: 768px) {
+    .hero-title {
+      font-size: 2.75rem;
+    }
+    .hero-subtitle {
+      font-size: 1.1rem;
+    }
+  }
+</style>

@@ -1,0 +1,350 @@
+---
+import { getCollection, getEntry, render } from 'astro:content';
+import Layout from '../../layouts/Layout.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import { getBlogUrl } from '../../lib/urls';
+
+export async function getStaticPaths() {
+  const blogs = await getCollection('blog');
+  
+  return blogs.map((post) => {
+    const topicSlug = post.data.topic;
+    const postSlug = post.id.split('/').pop() || '';
+    
+    let routeSlug = postSlug;
+    if (post.data.series) {
+      // series is stored as "topicSlug/seriesSlug"
+      const seriesSlug = post.data.series.includes('/') 
+        ? post.data.series.split('/')[1] 
+        : post.data.series;
+      routeSlug = `${seriesSlug}/${postSlug}`;
+    }
+    
+    return {
+      params: {
+        topic: topicSlug,
+        slug: routeSlug
+      },
+      props: { post }
+    };
+  });
+}
+
+const { post } = Astro.props;
+const { title, description, pubDate, updatedDate, topic: topicSlug, series: seriesId, tags, cover } = post.data;
+
+// Fetch topic metadata
+const topic = await getEntry('topics', topicSlug);
+
+// Fetch series metadata if applicable
+let series = null;
+if (seriesId) {
+  series = await getEntry('series', seriesId);
+}
+
+// Render markdown content
+const { Content } = await render(post);
+
+// Find previous and next posts in the series
+let prevPost = null;
+let nextPost = null;
+
+if (seriesId) {
+  const allBlogs = await getCollection('blog');
+  const isProd = import.meta.env.PROD;
+  const seriesBlogs = allBlogs
+    .filter((b) => !isProd || !b.data.draft)
+    .filter((b) => b.data.series === seriesId);
+  
+  // Sort chronologically ascending
+  seriesBlogs.sort((a, b) => a.data.pubDate.getTime() - b.data.pubDate.getTime());
+  
+  const currentIndex = seriesBlogs.findIndex((b) => b.id === post.id);
+  if (currentIndex > 0) {
+    prevPost = seriesBlogs[currentIndex - 1];
+  }
+  if (currentIndex < seriesBlogs.length - 1) {
+    nextPost = seriesBlogs[currentIndex + 1];
+  }
+}
+
+const formattedPubDate = new Date(pubDate).toLocaleDateString('en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric'
+});
+
+const formattedUpdatedDate = updatedDate ? new Date(updatedDate).toLocaleDateString('en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric'
+}) : null;
+---
+
+<Layout 
+  title={title} 
+  description={description}
+  image={cover}
+>
+  <div class="post-layout">
+    {topic && (
+      <Breadcrumbs 
+        topic={{ title: topic.data.title, slug: topic.id }}
+        series={series ? { title: series.data.title, slug: series.id.split('/').pop() || '' } : undefined}
+        postTitle={title}
+      />
+    )}
+
+    <article class="post-article">
+      <header class="post-header">
+        {series && (
+          <div class="post-series-context">
+            Part of the <a href={`/${topicSlug}/${series.id.split('/').pop()}/`} class="series-context-link">{series.data.title}</a> series
+          </div>
+        )}
+        
+        <h1 class="post-title">{title}</h1>
+        <p class="post-description">{description}</p>
+        
+        <div class="post-metadata">
+          <div class="meta-dates">
+            <span class="pub-date">Published: <time datetime={pubDate.toISOString()}>{formattedPubDate}</time></span>
+            {formattedUpdatedDate && (
+              <span class="updated-date">&bull; Updated: <time datetime={updatedDate.toISOString()}>{formattedUpdatedDate}</time></span>
+            )}
+          </div>
+          
+          {tags && tags.length > 0 && (
+            <div class="tags-row">
+              {tags.map((tag) => (
+                <span class="tag-badge">#{tag}</span>
+              ))}
+            </div>
+          )}
+        </div>
+        
+        {cover && (
+          <div class="post-cover">
+            <img src={cover} alt={title} class="post-cover-img" />
+          </div>
+        )}
+      </header>
+
+      <section class="prose post-content">
+        <Content />
+      </section>
+
+      {series && (prevPost || nextPost) && (
+        <nav class="series-navigation" aria-label="Series Navigation">
+          <h3 class="series-nav-title">Series Navigation</h3>
+          <p class="series-nav-subtitle">More from: {series.data.title}</p>
+          <div class="series-nav-links">
+            <div class="series-nav-prev">
+              {prevPost ? (
+                <a href={getBlogUrl(prevPost)} class="nav-link">
+                  <span class="nav-label">&larr; Previous Part</span>
+                  <span class="nav-title">{prevPost.data.title}</span>
+                </a>
+              ) : (
+                <span class="nav-disabled">First part of the series</span>
+              )}
+            </div>
+            
+            <div class="series-nav-next">
+              {nextPost ? (
+                <a href={getBlogUrl(nextPost)} class="nav-link">
+                  <span class="nav-label">Next Part &rarr;</span>
+                  <span class="nav-title">{nextPost.data.title}</span>
+                </a>
+              ) : (
+                <span class="nav-disabled">Latest part of the series</span>
+              )}
+            </div>
+          </div>
+        </nav>
+      )}
+    </article>
+  </div>
+</Layout>
+
+<style>
+  .post-layout {
+    max-width: var(--max-width-content);
+    margin: 0 auto;
+    padding: 0 1rem;
+  }
+
+  .post-article {
+    margin-top: 1.5rem;
+  }
+
+  .post-header {
+    margin-bottom: 2.5rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .post-series-context {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent-color);
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .series-context-link {
+    text-decoration: underline;
+  }
+
+  .post-title {
+    font-size: 3rem;
+    font-weight: 800;
+    line-height: 1.15;
+    margin-bottom: 1rem;
+    letter-spacing: -0.02em;
+  }
+
+  .post-description {
+    font-size: 1.25rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 1.5rem;
+  }
+
+  .post-metadata {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .meta-dates {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .tags-row {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .tag-badge {
+    background-color: var(--bg-card-hover);
+    border: 1px solid var(--border-color);
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .post-cover {
+    margin-top: 2rem;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    aspect-ratio: 16 / 9;
+  }
+
+  .post-cover-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .post-content {
+    margin-bottom: 4rem;
+  }
+
+  /* Series Navigation Box */
+  .series-navigation {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 1.75rem;
+    margin-top: 3rem;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .series-nav-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+  }
+
+  .series-nav-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+  }
+
+  .series-nav-links {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    border-top: 1px solid var(--border-color);
+    padding-top: 1.25rem;
+  }
+
+  .series-nav-prev, .series-nav-next {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .series-nav-next {
+    text-align: right;
+    align-items: flex-end;
+  }
+
+  .nav-link {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    color: var(--text-primary);
+  }
+
+  .nav-link:hover .nav-title {
+    color: var(--accent-color);
+    text-decoration: underline;
+  }
+
+  .nav-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--accent-color);
+    letter-spacing: 0.05em;
+  }
+
+  .nav-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .nav-disabled {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  @media (max-width: 768px) {
+    .post-title {
+      font-size: 2.5rem;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .series-nav-links {
+      grid-template-columns: 1fr;
+      gap: 1.25rem;
+    }
+    .series-nav-next {
+      text-align: left;
+      align-items: flex-start;
+    }
+  }
+</style>

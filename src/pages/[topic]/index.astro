@@ -1,0 +1,148 @@
+---
+import { getCollection } from 'astro:content';
+import Layout from '../../layouts/Layout.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import SeriesCard from '../../components/SeriesCard.astro';
+import BlogCard from '../../components/BlogCard.astro';
+
+export async function getStaticPaths() {
+  const topics = await getCollection('topics');
+  return topics.map((topic) => ({
+    params: { topic: topic.id },
+    props: { topic }
+  }));
+}
+
+const { topic } = Astro.props;
+
+// Fetch all blogs and series
+const allSeries = await getCollection('series');
+const allBlogs = await getCollection('blog');
+
+// Filter drafts in production
+const isProd = import.meta.env.PROD;
+const publicBlogs = allBlogs.filter((post) => !isProd || !post.data.draft);
+
+// Filter series belonging to this topic
+const topicSeries = allSeries.filter((s) => {
+  const refId = typeof s.data.topic === 'object' && 'id' in s.data.topic 
+    ? s.data.topic.id 
+    : String(s.data.topic);
+  return refId === topic.id;
+});
+
+// Filter blogs belonging to this topic
+const topicBlogs = publicBlogs.filter((b) => b.data.topic === topic.id);
+
+// Split into direct blogs (no series) vs series-linked blogs
+const directBlogs = topicBlogs.filter((b) => !b.data.series);
+
+// Helper to find the most recent activity date in a series
+const getSeriesRecentDate = (seriesId: string) => {
+  const seriesPosts = topicBlogs.filter((b) => b.data.series === seriesId);
+  if (seriesPosts.length === 0) return new Date(0);
+  return new Date(Math.max(...seriesPosts.map((p) => p.data.pubDate.getTime())));
+};
+
+// Construct a unified listing of series and direct blogs
+const unifiedItems = [
+  ...topicSeries.map((s) => {
+    const postCount = topicBlogs.filter((b) => b.data.series === s.id).length;
+    return {
+      type: 'series' as const,
+      id: s.id,
+      date: getSeriesRecentDate(s.id),
+      data: s,
+      postCount
+    };
+  }),
+  ...directBlogs.map((b) => ({
+    type: 'blog' as const,
+    id: b.id,
+    date: b.data.pubDate,
+    data: b,
+    postCount: 0 // Not applicable for direct blogs
+  }))
+];
+
+// Sort items by recent activity date descending
+unifiedItems.sort((a, b) => b.date.getTime() - a.date.getTime());
+---
+
+<Layout 
+  title={`${topic.data.title} — Topics`} 
+  description={topic.data.description}
+>
+  <Breadcrumbs topic={{ title: topic.data.title, slug: topic.id }} />
+
+  <header class="topic-header">
+    <h1 class="topic-title">{topic.data.title}</h1>
+    <p class="topic-description">{topic.data.description}</p>
+  </header>
+
+  <section class="content-section">
+    {unifiedItems.length === 0 ? (
+      <div class="empty-state">
+        <p>No content has been published in this topic yet. Check back soon!</p>
+      </div>
+    ) : (
+      <div class="grid-cards">
+        {unifiedItems.map((item) => {
+          if (item.type === 'series') {
+            return (
+              <div class="grid-item">
+                <SeriesCard series={item.data} postCount={item.postCount} />
+              </div>
+            );
+          } else {
+            return (
+              <div class="grid-item">
+                <BlogCard post={item.data} />
+              </div>
+            );
+          }
+        })}
+      </div>
+    )}
+  </section>
+</Layout>
+
+<style>
+  .topic-header {
+    margin-bottom: 3rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .topic-title {
+    font-size: 2.75rem;
+    font-weight: 800;
+    margin-bottom: 1rem;
+    letter-spacing: -0.02em;
+  }
+
+  .topic-description {
+    font-size: 1.15rem;
+    color: var(--text-secondary);
+    max-width: 800px;
+    margin-bottom: 0;
+  }
+
+  .content-section {
+    margin-top: 2rem;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+  }
+
+  .grid-item {
+    display: flex;
+    flex-direction: column;
+  }
+</style>

@@ -1,0 +1,110 @@
+---
+import { getTopicUrl, getSeriesUrl } from '../lib/urls';
+
+interface Props {
+  topic?: {
+    title: string;
+    slug: string;
+  };
+  series?: {
+    title: string;
+    slug: string;
+  };
+  postTitle?: string;
+}
+
+const { topic, series, postTitle } = Astro.props;
+---
+
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol class="breadcrumbs-list">
+    <li class="breadcrumbs-item">
+      <a href="/" class="breadcrumbs-link">Home</a>
+    </li>
+    
+    {topic && (
+      <li class="breadcrumbs-separator" aria-hidden="true">&gt;</li>
+      <li class="breadcrumbs-item">
+        {series || postTitle ? (
+          <a href={getTopicUrl(topic.slug)} class="breadcrumbs-link">{topic.title}</a>
+        ) : (
+          <span class="breadcrumbs-current" aria-current="page">{topic.title}</span>
+        )}
+      </li>
+    )}
+    
+    {topic && series && (
+      <li class="breadcrumbs-separator" aria-hidden="true">&gt;</li>
+      <li class="breadcrumbs-item">
+        {postTitle ? (
+          <a href={getSeriesUrl(topic.slug, series.slug)} class="breadcrumbs-link">{series.title}</a>
+        ) : (
+          <span class="breadcrumbs-current" aria-current="page">{series.title}</span>
+        )}
+      </li>
+    )}
+    
+    {postTitle && (
+      <li class="breadcrumbs-separator" aria-hidden="true">&gt;</li>
+      <li class="breadcrumbs-item">
+        <span class="breadcrumbs-current post-title-breadcrumb" aria-current="page">{postTitle}</span>
+      </li>
+    )}
+  </ol>
+</nav>
+
+<style>
+  .breadcrumbs {
+    margin-bottom: 2rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .breadcrumbs-list {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .breadcrumbs-item {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .breadcrumbs-link {
+    color: var(--text-muted);
+    transition: var(--transition-fast);
+  }
+
+  .breadcrumbs-link:hover {
+    color: var(--accent-color);
+  }
+
+  .breadcrumbs-separator {
+    color: var(--border-color);
+    font-size: 0.75rem;
+    user-select: none;
+  }
+
+  .breadcrumbs-current {
+    color: var(--text-secondary);
+  }
+
+  .post-title-breadcrumb {
+    color: var(--text-primary);
+    font-weight: 600;
+    max-width: 250px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  @media (max-width: 640px) {
+    .post-title-breadcrumb {
+      max-width: 150px;
+    }
+  }
+</style>

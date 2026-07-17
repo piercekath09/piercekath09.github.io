@@ -1,0 +1,5 @@
+{
+  "title": "Retrieval-Augmented Generation (RAG) Systems",
+  "description": "A comprehensive deep dive into building production-ready RAG pipelines, from text processing and vector embeddings to database search and generation.",
+  "order": 1
+}
